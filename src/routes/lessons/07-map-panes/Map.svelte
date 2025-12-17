@@ -1,5 +1,6 @@
-
-<script lang="ts" module>
+<script lang="ts">
+  import { loadStatesData } from "$lib/data/geojson";
+  import { onMount } from "svelte";
 
   const getColor = (d: number) => {
     return d > 1000 ? '#800026' :
@@ -20,29 +21,26 @@
     dashArray: '3',
     fillOpacity: 0.7
   })
-</script>
-
-
-<script lang="ts">
-  import { loadStatesData } from "$lib/data/geojson";
-
-  import { onMount } from "svelte";
-
+  
   onMount(async () => {
-    let geojson;
+    const statesData = await loadStatesData();
 
-    const map = L.map('map')
-    const tileLayer = L.tileLayer('https://tile.openstreetmap.org/{z}/{x}/{y}.png', {
-      maxZoom: 19,
-      attribution: '&copy; <a href="http://www.openstreetmap.org/copyright">OpenStreetMap</a>'
-    })
-    
-
-    tileLayer.addTo(map);
+    const map = L.map('map');
 
     map.setView([39.75621, -104.99404], 5);
+    
+    const labelsPane = map.createPane('labels');
+    labelsPane.style.zIndex = 650;
+    labelsPane.style.pointerEvents = 'none';
 
-    const statesData = await loadStatesData();
+    const positron = L.tileLayer('https://{s}.basemaps.cartocdn.com/light_nolabels/{z}/{x}/{y}.png', {
+      attribution: '©OpenStreetMap, ©CartoDB'
+    }).addTo(map);
+
+    const positronLabels = L.tileLayer('https://{s}.basemaps.cartocdn.com/light_only_labels/{z}/{x}/{y}.png', {
+      attribution: '©OpenStreetMap, ©CartoDB',
+      pane: 'labels'
+    }).addTo(map);
 
     const onMouseOver = (e: L.LayerEvent) => {
       const layer = e.target;
@@ -66,7 +64,7 @@
       map.fitBounds(e.target.getBounds());
     }
 
-    geojson = L.geoJson(statesData, {
+    const geojson = L.geoJson(statesData, {
       style: style,
       onEachFeature: function (feature, layer) {
         layer.on({
@@ -77,6 +75,11 @@
       }
     }).addTo(map);
 
+    geojson.eachLayer(function (layer) {
+      layer.bindPopup(layer.feature.properties.name);
+    });
+
+    map.fitBounds(geojson.getBounds());
 
   })
 </script>
